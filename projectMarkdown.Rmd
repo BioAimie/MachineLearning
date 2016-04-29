@@ -77,7 +77,6 @@ Figure Two:
 confusionMatrix(prediction.tree, train.test$classe)
 ```
 
-
 ###Predicting with Bagging
 
 The random forest method is used as predictive model for bagging. The train.train data are passed to train with a random forest model to create a prediction object and then the model is applied to the train.test set and checked for accuracy. The accuracy of the random forest model is 99.5%, with a tight 95% confidence interval and high specificity and sensitivity. The kappa value of .99 indicates that this predictive model is much better than classification based on guessing (or a kappa of ~0.5).
@@ -94,7 +93,19 @@ confusionMatrix(prediction.bag, train.test$classe)
 
 ##Conclusion
 
-##Applying the Model to Test
+###Error estimation and cross validation
+
+To find the out of sample error, the train function is called using a train control argument and the random forest method. This train control is passed a repeated cross validation argument with 3 folds and repeated 2 times (for the sake of time efficiency). The result is that the out of sample error is approximately 1 - accuarcy of the model. In the case of cross validating with 3 folds and repeating 2 times, the out of sampel errror is 1 - 99.39%, or 0.61%. This matches with the estimation when getting the true accuracy via summing up the classe varible using the prediction method and dividing by the length.
+
+```{r resampleError, echo = TRUE}
+fitControl <- trainControl(method='repeatedcv', number = 3, repeats = 2)
+modFit.cv <- train(classe~., train.train, method = 'rf', trControl = fitControl)
+prediction.cv <- predict(modFit.cv, newdata = train.test)
+confusionMatrix(prediction.cv, train.test$classe)
+1 - sum(prediction.cv == train.test$classe)/length(prediction.cv)
+```
+
+###Applying the Model to Test
 
 The model that best predicted train.test is the random forest classifier (bagging) and so this fit is applied to the test data set. The conclusion is that the best method predicts the 20 test samples to be divided as such: 7 A-type sets (according to specification), 8 B-type sets (throwing elbows forward), 1 each of C- and D-type sets (lifting halway, lowering halfway, respecitively), and 3 E-type sets (throwing hips to the front). 
 
@@ -104,5 +115,5 @@ prediction.test <- predict(modFit.bag, newdata = testing, type = 'class')
 
 Figure Four:
 ```{r returnPrecitionResults, echo=TRUE}
-prediction.test
+table(prediction.test)
 ```
