@@ -1,0 +1,108 @@
+---
+title: "Predicting Activity Performance Using Data from Personal Devices"
+author: "Aimie Faucett"
+date: "April 29, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objective
+
+The objective of this project is to use data from personal activity-monitoring devices to predict how well a user is performing a series of exercises. The *caret* package within R software is used as a basis for the predictive modeling. Both a training and test data set are provided. 
+
+## Methodology
+
+The training data are loaded and processed for preliminary cleaning. Initially, variables like user names, timestamps, etc. are discarded as they are not useful predictor variables. Additional variables are dropped from the data set if the column contains many ( more than 100) NA or blank elements. The libraries used in the analysis of the traning data are *caret*, *rattle*, *rpart*, and *randomForest*. The packages are used to preform the predictive analysis in two ways - predicting with trees (rpart method) and bagging (random forest method).
+
+```{r loadData, echo=FALSE}
+training <- read.csv('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', sep=',')
+testing <- read.csv('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv', sep=',')
+```
+
+```{r cleanData, echo=FALSE}
+cols <- colnames(training)
+noUse.ridCols <- c('X','user_name','raw_timestamp_part_1','raw_timestamp_part_2','cvtd_timestamp','new_window','num_window')
+nas <- c()
+for(i in 1:length(cols)) { 
+    nas <- c(nas, length(training[is.na(training[,cols[i]]), 1])) 
+}
+nas.ridCols <- colnames(training)[(which(nas>100))]
+blanks <- c()
+for(i in 1:length(cols)) { 
+  blanks <- c(blanks, length(training[training[,cols[i]]=='',1 ])) 
+}
+blank.ridCols <- colnames(training)[which(blanks>100)]
+rid <- c(noUse.ridCols, nas.ridCols, blank.ridCols)
+training <- training[ ,!(colnames(training) %in% rid)]
+testing <- testing[ ,!(colnames(testing) %in% rid)]
+```
+
+After cleaning the data, the traning data are partitioned into two sets, a train.train (65% of the original training data set) and train.test set, such that the predictive methods used on train.train can be tested on train.test before utilizing the algorithm on the real test set. The train.train set is then passed through a decision tree and random forest bagging training. Then the models are applied to the train.test set to determine the best model for predicting on the real test data set. This is done by using a confusion matrix.
+
+```{r splitTraning, echo=FALSE, hide = TRUE, message = FALSE, warning = FALSE}
+library(caret)
+library(e1071)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+set.seed(42)
+in.Training <- createDataPartition(training$classe, p = 0.65, list = FALSE)
+train.train <- training[in.Training, ]
+train.test <- training[-in.Training, ]
+```
+
+##Results
+
+###Predicting with Decision Tree
+
+The *rpart* library is used to produce a prediction object using the train.train data set. The *rattle* package is used to visualize the results and a confusion matrix is utilized to determine the quality of the predictive algorithm. The accuracy of the decision tree method is less than 80% and the statistics are rather poor for several classifications. The specificity, or true negative rate, is quite good, but the true postive rate (sensitivity). The kappa values is only around 0.66 and therefore the classifier is only about 15% better than perfoming classification based on guessing.
+
+```{r trainPredictTree, echo=FALSE}
+set.seed(42)
+modFit.tree <- rpart(classe~., data = train.train, method = 'class')
+prediction.tree <- predict(modFit.tree, newdata = train.test, type='class')
+```
+
+Figure One:
+```{r treeGraphic, echo=FALSE}
+fancyRpartPlot(modFit.tree)
+```
+
+Figure Two:
+```{r confusionMatrixTree, echo=TRUE}
+confusionMatrix(prediction.tree, train.test$classe)
+```
+
+
+###Predicting with Bagging
+
+The random forest method is used as predictive model for bagging. The train.train data are passed to train with a random forest model to create a prediction object and then the model is applied to the train.test set and checked for accuracy. The accuracy of the random forest model is 99.5%, with a tight 95% confidence interval and high specificity and sensitivity. The kappa value of .99 indicates that this predictive model is much better than classification based on guessing (or a kappa of ~0.5).
+
+```{r trainPredictBag, echo=FALSE}
+modFit.bag <- randomForest(classe~., data = train.train, method = 'class')
+prediction.bag <- predict(modFit.bag, newdata = train.test, type='class')
+```
+
+Figure Three:
+```{r confusionMatrixBag, echo=TRUE}
+confusionMatrix(prediction.bag, train.test$classe)
+```
+
+##Conclusion
+
+##Applying the Model to Test
+
+The model that best predicted train.test is the random forest classifier (bagging) and so this fit is applied to the test data set. The conclusion is that the best method predicts the 20 test samples to be divided as such: 7 A-type sets (according to specification), 8 B-type sets (throwing elbows forward), 1 each of C- and D-type sets (lifting halway, lowering halfway, respecitively), and 3 E-type sets (throwing hips to the front). 
+
+```{r applyBestFit, echo=FALSE}
+prediction.test <- predict(modFit.bag, newdata = testing, type = 'class')
+```
+
+Figure Four:
+```{r returnPrecitionResults, echo=TRUE}
+prediction.test
+```
